@@ -6,6 +6,6 @@
 int
 main(int argc, char *argv[])
 {
-  printf(1, "STEST %d\n", stest());
+  printf(1, " STEST %d %d\n", stest(), getpid());
   exit();
 }

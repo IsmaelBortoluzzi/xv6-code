@@ -2,7 +2,7 @@ struct stat;
 struct rtcdate;
 
 // system calls
-int fork(void);
+int fork(int);
 int exit(void) __attribute__((noreturn));
 int wait(void);
 int pipe(int*);
@@ -38,3 +38,6 @@ void* memset(void*, int, uint);
 void* malloc(uint);
 void free(void*);
 int atoi(const char*);
+
+// Default number of tickets per process
+#define TICKETS 10
