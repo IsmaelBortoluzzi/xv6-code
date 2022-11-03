@@ -71,7 +71,7 @@ myproc(void) {
 // state required to run in the kernel.
 // Otherwise return 0.
 static struct proc*
-allocproc(void)
+allocproc(int tickets)
 {
   struct proc *p;
   char *sp;
@@ -88,6 +88,7 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
+  p->tickets = tickets;
 
   release(&ptable.lock);
 
@@ -123,7 +124,7 @@ userinit(void)
   struct proc *p;
   extern char _binary_initcode_start[], _binary_initcode_size[];
 
-  p = allocproc();
+  p = allocproc(25);  // userinit should have more TICKETS
   
   initproc = p;
   if((p->pgdir = setupkvm()) == 0)
@@ -185,7 +186,7 @@ fork(int tickets)
   struct proc *curproc = myproc();
 
   // Allocate process.
-  if((np = allocproc()) == 0){
+  if((np = allocproc(tickets)) == 0){
     return -1;
   }
 
@@ -199,7 +200,6 @@ fork(int tickets)
   np->sz = curproc->sz;
   np->parent = curproc;
   *np->tf = *curproc->tf;
-  np->tickets = tickets;
 
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
@@ -312,12 +312,14 @@ wait(void)
   }
 }
 
+// Custom random function to return 
+// the tickets number of a process
 unsigned long randstate = 1;
 unsigned int
-rand()
+rand_choice(int total_tickets)
 {
   randstate = randstate * 1664525 + 1013904223;
-  return randstate;
+  return total_tickets == 0 ? randstate : randstate % total_tickets + 1;
 }
 
 //PAGEBREAK: 42
@@ -334,16 +336,42 @@ scheduler(void)
   struct proc *p;
   struct cpu *c = mycpu();
   c->proc = 0;
-  
+
+  int last_highest_ticket = 1;
+  int total_tickets;
+  unsigned int chosen;
+
   for(;;){
     // Enable interrupts on this processor.
     sti();
 
+    total_tickets = 0;
+
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
+
+
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE)
+      total_tickets += p->tickets;
+    }
+
+    chosen = rand_choice(total_tickets);
+    // cprintf("total_tickets: %d ; chosen: %d\n", total_tickets, chosen);  \\ FOR TESTS
+
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      // cprintf("last_highest_ticket: %d ; chosen: %d\n", last_highest_ticket, chosen);  \\ FOR TESTS
+
+      // If chosen is greater than the range of the process's tickets, the proc is not the chosen.
+      if(chosen > p->tickets + last_highest_ticket){
+        last_highest_ticket += p->tickets;
         continue;
+      }
+
+      // If chosen proc is not runnable, we should choose another and restart the search.
+      if(p->state != RUNNABLE){
+        chosen = rand_choice(total_tickets);
+        continue;
+      }
 
       // Switch to chosen process.  It is the process's job
       // to release ptable.lock and then reacquire it
