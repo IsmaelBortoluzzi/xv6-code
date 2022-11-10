@@ -6,6 +6,7 @@
 #include "x86.h"
 #include "proc.h"
 #include "spinlock.h"
+#include "stest.h"
 
 struct {
   struct spinlock lock;
@@ -322,6 +323,8 @@ rand_choice(int total_tickets)
   return total_tickets == 0 ? randstate : randstate % total_tickets + 1;
 }
 
+extern StestProcs* stest_get_procs_num_times_scheduled();
+
 //PAGEBREAK: 42
 // Per-CPU process scheduler.
 // Each CPU calls scheduler() after setting itself up.
@@ -340,26 +343,25 @@ scheduler(void)
   int last_highest_ticket = 1;
   int total_tickets;
   unsigned int chosen;
+  StestProcs* stest_procs  = stest_get_procs_num_times_scheduled();
 
   for(;;){
     // Enable interrupts on this processor.
     sti();
 
     total_tickets = 0;
-
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
-
 
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       total_tickets += p->tickets;
     }
 
     chosen = rand_choice(total_tickets);
-    // cprintf("total_tickets: %d ; chosen: %d\n", total_tickets, chosen);  \\ FOR TESTS
+    // cprintf("total_tickets: %d ; chosen: %d\n", total_tickets, chosen);  // FOR TESTS
 
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      // cprintf("last_highest_ticket: %d ; chosen: %d\n", last_highest_ticket, chosen);  \\ FOR TESTS
+      // cprintf("last_highest_ticket: %d ; chosen: %d\n", last_highest_ticket, chosen);  // FOR TESTS
 
       // If chosen is greater than the range of the process's tickets, the proc is not the chosen.
       if(chosen > p->tickets + last_highest_ticket){
@@ -373,6 +375,12 @@ scheduler(void)
         continue;
       }
 
+      for(int index=0; index<TEST_PROCESSES; index++){
+        if(p->pid == stest_procs->procs_pids_times_scheduled[index][0]){
+          stest_procs->procs_pids_times_scheduled[index][1]++;
+          // cprintf("total_tickets: %d ; chosen: %d ; pid: %d\n", total_tickets, chosen, p->pid);
+        }
+      }
       // Switch to chosen process.  It is the process's job
       // to release ptable.lock and then reacquire it
       // before jumping back to us.

@@ -6,6 +6,7 @@
 #include "memlayout.h"
 #include "mmu.h"
 #include "proc.h"
+#include "stest.h"
 
 int
 sys_fork(void)
@@ -95,8 +96,45 @@ sys_uptime(void)
   return xticks;
 }
 
+StestProcs procs_num_times_scheduled;
+int last_position  = 0;
+int num_calls = 0;
+
 int
 sys_stest(void)
 {
-  return 777;
+  num_calls++;
+  int proc_pid;
+
+  if(argint(0, &proc_pid) < 0)
+    return -1;
+  
+  cprintf("proc_pid: %d\n", proc_pid);
+  
+  if(num_calls <= TEST_PROCESSES)
+    stest_save_pid(proc_pid);
+  else
+    stest_print();
+  
+  return 0;
+}
+
+void
+stest_save_pid(int pid)
+{
+  procs_num_times_scheduled.procs_pids_times_scheduled[last_position][0] = pid;
+  procs_num_times_scheduled.procs_pids_times_scheduled[last_position++][1] = 0;
+}
+
+StestProcs*
+stest_get_procs_num_times_scheduled()
+{
+  return &procs_num_times_scheduled;
+}
+
+void
+stest_print()
+{
+  for(int i=0; i<TEST_PROCESSES; i++)
+    cprintf("PID: %d, TIMES SCHEDULED: %d\n", procs_num_times_scheduled.procs_pids_times_scheduled[i][0], procs_num_times_scheduled.procs_pids_times_scheduled[i][1]);
 }
