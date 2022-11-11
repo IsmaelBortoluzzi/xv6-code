@@ -125,7 +125,7 @@ userinit(void)
   struct proc *p;
   extern char _binary_initcode_start[], _binary_initcode_size[];
 
-  p = allocproc(25);  // userinit should have more TICKETS
+  p = allocproc(10);  // userinit should have more TICKETS
   
   initproc = p;
   if((p->pgdir = setupkvm()) == 0)
@@ -325,6 +325,17 @@ rand_choice(int total_tickets)
 
 extern StestProcs* stest_get_procs_num_times_scheduled();
 
+int
+count_scheduled()
+{
+  StestProcs* stest_procs = stest_get_procs_num_times_scheduled();
+  int total = 0;
+  for (int i=0; i<TEST_PROCESSES; i++){
+    total += stest_procs->procs_pids_times_scheduled[i][1];
+  }
+  return total == 0 ? 1 : total;
+}
+
 //PAGEBREAK: 42
 // Per-CPU process scheduler.
 // Each CPU calls scheduler() after setting itself up.
@@ -340,7 +351,7 @@ scheduler(void)
   struct cpu *c = mycpu();
   c->proc = 0;
 
-  int last_highest_ticket = 1;
+  int last_highest_ticket;
   int total_tickets;
   unsigned int chosen;
   StestProcs* stest_procs  = stest_get_procs_num_times_scheduled();
@@ -350,12 +361,13 @@ scheduler(void)
     sti();
 
     total_tickets = 0;
+    last_highest_ticket = 1;
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
 
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      total_tickets += p->tickets;
-    }
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+      if(p->state == RUNNABLE)
+        total_tickets += p->tickets;
 
     chosen = rand_choice(total_tickets);
     // cprintf("total_tickets: %d ; chosen: %d\n", total_tickets, chosen);  // FOR TESTS
@@ -363,15 +375,14 @@ scheduler(void)
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       // cprintf("last_highest_ticket: %d ; chosen: %d\n", last_highest_ticket, chosen);  // FOR TESTS
 
+      // If chosen proc is not runnable, we should choose another and restart the search.
+      if(p->state != RUNNABLE){
+          continue;
+      }
+
       // If chosen is greater than the range of the process's tickets, the proc is not the chosen.
       if(chosen > p->tickets + last_highest_ticket){
         last_highest_ticket += p->tickets;
-        continue;
-      }
-
-      // If chosen proc is not runnable, we should choose another and restart the search.
-      if(p->state != RUNNABLE){
-        chosen = rand_choice(total_tickets);
         continue;
       }
 
@@ -381,6 +392,13 @@ scheduler(void)
           // cprintf("total_tickets: %d ; chosen: %d ; pid: %d\n", total_tickets, chosen, p->pid);
         }
       }
+      
+      if(count_scheduled() % 500 == 0){
+        stest_print();
+        cprintf("total_tickets: %d ; chosen: %d ; pid: %d\n", total_tickets, chosen, p->pid);
+        cprintf("\n");
+      }
+      
       // Switch to chosen process.  It is the process's job
       // to release ptable.lock and then reacquire it
       // before jumping back to us.
