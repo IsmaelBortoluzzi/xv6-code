@@ -16,6 +16,11 @@ sys_fork(void)
   if(argint(0, &tickets) < 0)
     return -1;
 
+  if(tickets < MINIMUM_TICKETS)
+    tickets = MINIMUM_TICKETS;
+  else if(tickets > MAXIMUM_TICKETS)
+    tickets = MAXIMUM_TICKETS;
+
   return fork(tickets);
 }
 
@@ -135,6 +140,17 @@ stest_get_procs_num_times_scheduled()
 void
 stest_print()
 {
+  float total_schedules = 0.0;
   for(int i=0; i<TEST_PROCESSES; i++)
-    cprintf("PID: %d, TIMES SCHEDULED: %d\n", procs_num_times_scheduled.procs_pids_times_scheduled[i][0], procs_num_times_scheduled.procs_pids_times_scheduled[i][1]);
+    total_schedules += procs_num_times_scheduled.procs_pids_times_scheduled[i][1];
+
+  for(int i=0; i<TEST_PROCESSES; i++){
+    int pid = procs_num_times_scheduled.procs_pids_times_scheduled[i][0];
+    int times_scheduled = procs_num_times_scheduled.procs_pids_times_scheduled[i][1];
+    float percentage = (float) times_scheduled / total_schedules * 100.0;
+    int percentage_upper_part = (int) percentage;
+    int percentage_lower_part = (percentage - (int) percentage) * 100;
+
+    cprintf("PID: %d, TIMES SCHEDULED: %d, PERCENTAGE: %d.%d%% \n", pid, times_scheduled, percentage_upper_part, percentage_lower_part);
+  }
 }

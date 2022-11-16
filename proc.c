@@ -336,6 +336,21 @@ count_scheduled()
   return total == 0 ? 1 : total;
 }
 
+// should jump here with &ptable.lock acquired;
+void
+reset_control_vars(int* last_highest_ticket, int* total_tickets, unsigned int* chosen)
+{
+  struct proc *p;
+  *last_highest_ticket = 1;
+  *total_tickets = 0;
+
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+    if(p->state == RUNNABLE)
+      *total_tickets += p->tickets;
+
+  *chosen = rand_choice(*total_tickets);
+}
+
 //PAGEBREAK: 42
 // Per-CPU process scheduler.
 // Each CPU calls scheduler() after setting itself up.
@@ -360,16 +375,10 @@ scheduler(void)
     // Enable interrupts on this processor.
     sti();
 
-    total_tickets = 0;
-    last_highest_ticket = 1;
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
 
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
-      if(p->state == RUNNABLE)
-        total_tickets += p->tickets;
-
-    chosen = rand_choice(total_tickets);
+    reset_control_vars(&last_highest_ticket, &total_tickets, &chosen);
     // cprintf("total_tickets: %d ; chosen: %d\n", total_tickets, chosen);  // FOR TESTS
 
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
@@ -381,7 +390,8 @@ scheduler(void)
       }
 
       // If chosen is greater than the range of the process's tickets, the proc is not the chosen.
-      if(chosen > p->tickets + last_highest_ticket){
+      // cprintf("p->pid %d ; p->tickets %d ; p->tickets + last_highest_ticket: %d ; chosen: %d\n", p->pid, p->tickets, p->tickets + last_highest_ticket - 1, chosen);  // FOR TESTS
+      if(chosen > p->tickets + last_highest_ticket - 1){
         last_highest_ticket += p->tickets;
         continue;
       }
@@ -395,7 +405,7 @@ scheduler(void)
       
       if(count_scheduled() % 500 == 0){
         stest_print();
-        cprintf("total_tickets: %d ; chosen: %d ; pid: %d\n", total_tickets, chosen, p->pid);
+        cprintf("total_tickets: %d ; chosen: %d ; pid: %d ; pticktes: %d\n", total_tickets, chosen, p->pid, p->tickets);
         cprintf("\n");
       }
       
@@ -412,6 +422,7 @@ scheduler(void)
       // Process is done running for now.
       // It should have changed its p->state before coming back.
       c->proc = 0;
+      break;
     }
     release(&ptable.lock);
 
