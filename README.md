@@ -1,3 +1,12 @@
+# HOW TO TEST THE SCHEDULER
+After running make and make qemu, type stest in the xv6 terminal and observe the statistics shown
+
+We fork 5 processes with this syscall and all run a bubble sort, which is a very slow quadratic
+sort algorithm, in an array with 500000 elements randomly inserted. We give process One 5 tickets,
+process Two 10 tickets, process Three 15 tickets, process Four 20 tickets and process Five 25 tickets.
+Every 500th scheduled time, the statistics are printed out.
+
+# ORIGINAL XV6 README
 NOTE: we have stopped maintaining the x86 version of xv6, and switched
 our efforts to the RISC-V version
 (https://github.com/mit-pdos/xv6-riscv.git)
