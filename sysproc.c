@@ -102,7 +102,7 @@ sys_uptime(void)
 }
 
 StestProcs procs_num_times_scheduled;
-int last_position  = 0;
+int last_position = 0;
 int num_calls = 0;
 
 int
@@ -114,12 +114,16 @@ sys_stest(void)
   if(argint(0, &proc_pid) < 0)
     return -1;
   
-  cprintf("proc_pid: %d\n", proc_pid);
   
-  if(num_calls <= TEST_PROCESSES)
+  if(num_calls <= TEST_PROCESSES){
+    cprintf("proc_pid: %d\n", proc_pid);
     stest_save_pid(proc_pid);
-  else
+  }
+  else{
     stest_print();
+    last_position = 0;
+    num_calls = 0;
+  }
   
   return 0;
 }
